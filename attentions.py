@@ -1,0 +1,109 @@
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+class ScaledDotProductAttention(nn.Module):
+    def __init__(self, emd_dim):
+        super(ScaledDotProductAttention, self).__init__()
+        
+        # scaling factor 1 / sqrt(dimension of queries and keys)
+        self.scaling_factor = torch.sqrt(torch.tensor(emd_dim))
+        
+        
+    def forward(self, query, key, value, mask = None):
+        # Scaled scroe of the Matrix multiplication of query and key
+        attn_score = torch.bmm(query, key.transpose(1, 2)) / self.scaling_factor
+
+        # Masking (Optional)
+        # shape of mask: (batch size, input length of query, input length of key)
+        if mask is not None:
+            attn_score.masked_fill_(mask, -1e18)
+
+        # Softmax of the scaled score
+        attn_score = F.softmax(attn_score, -1)
+        
+        # Matrix multiplication of the scaled score and value
+        output = torch.bmm(attn_score, value)
+        
+        return output, attn_score
+      
+      
+      
+class MultiHeadAttention(nn.Module):
+
+    def __init__(self, emd_dim, num_heads):
+        super(MultiHeadAttention, self).__init__()
+        
+        self.head_dim = int(emd_dim / num_heads)
+        self.num_heads = num_heads
+        self.scaled_dot_attn = ScaledDotProductAttention(self.head_dim)
+        
+        # initialize one feed-forward layer (head dimension x number of heads) of each q, k and v
+        # instead of initializing number of heads of feed-forward layers (head dimension / number of heads)
+        self.query_proj = nn.Linear(emd_dim, self.head_dim * num_heads)
+        self.key_proj = nn.Linear(emd_dim, self.head_dim * num_heads)
+        self.value_proj = nn.Linear(emd_dim, self.head_dim * num_heads)
+        
+        self.out_proj = nn.Linear(emd_dim, self.head_dim * num_heads)
+        
+        
+    def reshape_from_feed_forward(self, batch_size, _tensor):
+        return _tensor.view(batch_size, -1, self.num_heads, self.head_dim)
+    
+    
+    def reshape_to_ScaledDotProductAttention(self, batch_size, _tensor):
+        # before shape: (batch size, input length, number of heads, head dimnesion)
+        # after shape: (batch size, number of heads, input length, head dimnesion)
+        _tensor = _tensor.permute(0, 2, 1, 3)
+        
+        # reshape to feed the tensor to ScaledDotProductAttention
+        return _tensor.contiguous().view(batch_size * self.num_heads, -1, self.head_dim)
+    
+    
+    def reshape_to_concat(self, batch_size, _tensor):
+        # before shape: (batch size, number of heads, input length, head dimnesion)
+        # after shape: (batch size, input length, number of heads, head dimnesion)
+        _tensor = _tensor.permute(0, 2, 1, 3)
+        return _tensor.contiguous().view(batch_size, -1, self.num_heads * self.head_dim)
+
+    
+    def forward(self, query, key, value, mask = None):
+        # shape of input of q, k and v: (batch size, input length, embedding dimension)
+        batch_size = query.size()[0]
+        
+        # feed-forward network
+        query = self.query_proj(query)
+        key = self.key_proj(key)
+        value = self.value_proj(value)
+        
+        # reshape the result of the feed-forward network
+        # shape after the feed-forward network of q, k and v: (batch, input length, number of heads, head dimnesion)
+        query = self.reshape_from_feed_forward(batch_size, query)
+        key = self.reshape_from_feed_forward(batch_size, key)
+        value = self.reshape_from_feed_forward(batch_size, value)    
+        
+        # reshape the result of the feed-forward network to feed it to ScaledDotProductAttention
+        # shape: (number of heads * batch, input length, head dimnesion)
+        query = self.reshape_to_ScaledDotProductAttention(batch_size, query)
+        key = self.reshape_to_ScaledDotProductAttention(batch_size, key)
+        value = self.reshape_to_ScaledDotProductAttention(batch_size, value)
+        
+        
+        # shape of mask: (batch size, number of heads, input length of query, input length of key)
+        if mask is not None:
+            mask = mask.unsqueeze(1).repeat(1, self.num_heads, 1, 1)
+
+        output, attn_score = self.scaled_dot_attn(query, key, value, mask)
+
+        # reshape the result of the ScaledDotProductAttention
+        # shape: (number of heads, batch size, input length, head dimnesion)
+        output = output.view(self.num_heads, batch_size, -1, self.head_dim)
+        
+        # reshape to concat
+        # shape: (number of heads, batch size, input length, head dimnesion)
+        output = self.reshape_to_concat(batch_size, output)
+        
+        # final feed-forward network
+        output = self.out_proj(output)
+
+        return output, attn_score
