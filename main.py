@@ -2,7 +2,7 @@ import torch
 import argparse
 from text_processing import get_nlp_pipeline, word_tokenization
 import my_onehot
-import ScaledDotProductAttention, MultiHeadAttention
+from attentions import ScaledDotProductAttention, MultiHeadAttention
 
 def main(args):
     text_list = ["We are about to study the idea of a computational process.", 
@@ -13,9 +13,7 @@ def main(args):
             "In effect, we conjure the spirits of the computer with our spells."]
     
     cur_text = "People create a computational process."
-    
-    if args.encoding != "bert":
-        selected_nlp_pipeline = get_nlp_pipeline(args.nlp_pipeline)
+
     
     # One-hot Encoding
     sklearn_onehotencoder = my_onehot.build_onehot_encoding_model(args.unk_ignore)
@@ -29,29 +27,30 @@ def main(args):
     
     batch_size = 1
     input_length, emb_dim = embeddings.size()
-    
+    query = key = value = embeddings.reshape(batch_size, input_length, emb_dim)
+
+    print(query.type())
     if args.attention == "scaleddotproduct":
-        model = ScaledDotProductAttention(emd_dim)
-        query = key = value = embeddings.reshape(batch_size, input_length, emb_dim)
+        model = ScaledDotProductAttention(emb_dim)
         output, attn_score = model(query, key, value)
         
         print("Scaled-Dot-Product Attention Result")
         print(output)
         
     elif args.attention == "multihead":
-        if emd_dim % num_heads != 0:
-          divisor_list = []
-          for i in range(1, sample_num):
-          if sample_num % i == 0:
-              sample_list.append(i)
-          num_heads = sample_list[len(sample_list)//2]
+        if emb_dim % args.num_heads != 0:
+            divisor_list = []
+            for i in range(1, emb_dim):
+                if emb_dim % i == 0:
+                    divisor_list.append(i)
+            num_heads = divisor_list[len(divisor_list)//2]
         else:
-          num_heads = args.num_heads
-          
-        model = MultiHeadAttention(emd_dim, num_heads)
+            num_heads = args.num_heads
+
+        model = MultiHeadAttention(emb_dim, num_heads)
         output, attn_score = model(query, key, value)
-        
-        print("Multi-Head Attention Result (Number of heads: {})".format(num_heads)
+
+        print("Multi-Head Attention Result (Number of heads: {})".format(num_heads))
         print(output)
       
     else:
@@ -67,7 +66,7 @@ if __name__ == "__main__":
     parser.add_argument("--nlp_pipeline", default="spacy", type=str, help="NLP preprocessing pipeline.")
     parser.add_argument("--unk_ignore", default=True, help="Ignore unknown tokens.")
     parser.add_argument("--num_heads", default=8, help="The number of heads for multi-head attention.")
-    parser.add_argument("--attention", default="scaleddotproduct", type=str, help="Type of attention layer. (scaleddotproduct, multihead)")
+    parser.add_argument("--attention", default="multihead", type=str, help="Type of attention layer. (scaleddotproduct, multihead)")
     args = parser.parse_args()
 
     main(args)
