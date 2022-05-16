@@ -1,5 +1,4 @@
 import torch
-import numpy as np
 from sklearn import preprocessing
 from text_processing import get_nlp_pipeline, word_tokenization
 
