@@ -67,4 +67,4 @@ def build_onehot_encoding_model(unk_ignore):
 
 def onehot_encoding(_encoder, _tks):
     tk_list = [[x] for x in _tks]
-    return torch.tensor([x for x in _encoder.transform(tk_list).toarray()], dtype=torch.float)
+    return torch.tensor(_encoder.transform(tk_list).toarray(), dtype=torch.float)
