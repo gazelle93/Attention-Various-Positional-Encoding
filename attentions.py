@@ -52,8 +52,8 @@ class MultiHeadAttention(nn.Module):
     
     
     def reshape_to_ScaledDotProductAttention(self, batch_size, _tensor):
-        # before shape: (batch size, input length, number of heads, head dimnesion)
-        # after shape: (batch size, number of heads, input length, head dimnesion)
+        # before shape: (batch size, input length, number of heads, head dimension)
+        # after shape: (batch size, number of heads, input length, head dimension)
         _tensor = _tensor.permute(0, 2, 1, 3)
         
         # reshape to feed the tensor to ScaledDotProductAttention
@@ -61,8 +61,8 @@ class MultiHeadAttention(nn.Module):
     
     
     def reshape_to_concat(self, batch_size, _tensor):
-        # before shape: (batch size, number of heads, input length, head dimnesion)
-        # after shape: (batch size, input length, number of heads, head dimnesion)
+        # before shape: (batch size, number of heads, input length, head dimension)
+        # after shape: (batch size, input length, number of heads, head dimension)
         _tensor = _tensor.permute(0, 2, 1, 3)
         return _tensor.contiguous().view(batch_size, -1, self.num_heads * self.head_dim)
 
@@ -77,13 +77,13 @@ class MultiHeadAttention(nn.Module):
         value = self.value_proj(value)
         
         # reshape the result of the feed-forward network
-        # shape after the feed-forward network of q, k and v: (batch, input length, number of heads, head dimnesion)
+        # shape after the feed-forward network of q, k and v: (batch, input length, number of heads, head dimension)
         query = self.reshape_from_feed_forward(batch_size, query)
         key = self.reshape_from_feed_forward(batch_size, key)
         value = self.reshape_from_feed_forward(batch_size, value)    
         
         # reshape the result of the feed-forward network to feed it to ScaledDotProductAttention
-        # shape: (number of heads * batch, input length, head dimnesion)
+        # shape: (number of heads * batch, input length, head dimension)
         query = self.reshape_to_ScaledDotProductAttention(batch_size, query)
         key = self.reshape_to_ScaledDotProductAttention(batch_size, key)
         value = self.reshape_to_ScaledDotProductAttention(batch_size, value)
@@ -96,11 +96,11 @@ class MultiHeadAttention(nn.Module):
         output, attn_score = self.scaled_dot_attn(query, key, value, mask)
 
         # reshape the result of the ScaledDotProductAttention
-        # shape: (number of heads, batch size, input length, head dimnesion)
+        # shape: (number of heads, batch size, input length, head dimension)
         output = output.view(self.num_heads, batch_size, -1, self.head_dim)
         
         # reshape to concat
-        # shape: (number of heads, batch size, input length, head dimnesion)
+        # shape: (number of heads, batch size, input length, head dimension)
         output = self.reshape_to_concat(batch_size, output)
         
         # final feed-forward network
