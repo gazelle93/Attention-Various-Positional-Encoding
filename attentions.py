@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+# Scaled Dot Product Attention using Absolute Positional Encoding
 class ScaledDotProductAttention(nn.Module):
     def __init__(self, emb_dim):
         super(ScaledDotProductAttention, self).__init__()
@@ -11,7 +12,7 @@ class ScaledDotProductAttention(nn.Module):
         
         
     def forward(self, query, key, value, mask = None):
-        # Scaled scroe of the Matrix multiplication of query and key
+        # Scaled score of the Matrix multiplication of query and key (e)
         attn_score = torch.bmm(query, key.transpose(1, 2)) / self.scaling_factor
 
         # Masking (Optional)
@@ -19,13 +20,35 @@ class ScaledDotProductAttention(nn.Module):
         if mask is not None:
             attn_score.masked_fill_(mask, -1e18)
 
-        # Softmax of the scaled score
+        # Softmax of the scaled score (alpha)
         attn_score = F.softmax(attn_score, -1)
         
-        # Matrix multiplication of the scaled score and value
+        # Matrix multiplication of the scaled score and value (z)
         output = torch.bmm(attn_score, value)
         
         return output, attn_score
+
+
+class AbsolutePositionalEncoder(nn.Module):
+    def __init__(self, emb_dim, max_position=512):
+        super(AbsolutePositionalEncoder, self).__init__()
+        self.position = torch.arange(max_position).unsqueeze(1)
+
+        self.positional_encoding = torch.zeros(1, max_position, emb_dim)
+
+        _2i = torch.arange(0, emb_dim, step=2).float()
+
+        # PE(pos, 2i) = sin(pos/10000^(2i/d_model))
+        self.positional_encoding[0, :, 0::2] = torch.sin(self.position / (10000 ** (_2i / emb_dim)))
+
+        # PE(pos, 2i+1) = cos(pos/10000^(2i/d_model))
+        self.positional_encoding[0, :, 1::2] = torch.cos(self.position / (10000 ** (_2i / emb_dim)))
+
+    def forward(self, x):
+        # batch_size, input_len, embedding_dim
+        batch_size, seq_len, _ = x.size()
+
+        return self.positional_encoding[:batch_size, :seq_len, :]
       
       
       
