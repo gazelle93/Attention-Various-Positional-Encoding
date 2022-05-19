@@ -65,6 +65,13 @@ def build_onehot_encoding_model(unk_ignore):
 
     return model
 
-def onehot_encoding(_encoder, _tks):
+def get_onehot_encoding(text_list, cur_text, _nlp_pipeline, _unk_igsnore):
+    sklearn_onehotencoder = build_onehot_encoding_model(_unk_igsnore)
+    token2idx_dict, _ = init_token2idx(text_list, _nlp_pipeline)
+    sklearn_onehotencoder.fit([[t] for t in token2idx_dict])
+
+    _tks = get_tokens(cur_text, _nlp_pipeline)
+
     tk_list = [[x] for x in _tks]
-    return torch.tensor(_encoder.transform(tk_list).toarray(), dtype=torch.float)
+
+    return torch.tensor(sklearn_onehotencoder.transform(tk_list).toarray(), dtype=torch.float)
