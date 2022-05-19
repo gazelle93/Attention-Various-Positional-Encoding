@@ -3,11 +3,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 class ScaledDotProductAttention(nn.Module):
-    def __init__(self, emd_dim):
+    def __init__(self, emb_dim):
         super(ScaledDotProductAttention, self).__init__()
         
         # scaling factor 1 / sqrt(dimension of queries and keys)
-        self.scaling_factor = torch.sqrt(torch.tensor(emd_dim))
+        self.scaling_factor = torch.sqrt(torch.tensor(emb_dim))
         
         
     def forward(self, query, key, value, mask = None):
@@ -31,20 +31,20 @@ class ScaledDotProductAttention(nn.Module):
       
 class MultiHeadAttention(nn.Module):
 
-    def __init__(self, emd_dim, num_heads):
+    def __init__(self, emb_dim, num_heads):
         super(MultiHeadAttention, self).__init__()
         
-        self.head_dim = int(emd_dim / num_heads)
+        self.head_dim = int(emb_dim / num_heads)
         self.num_heads = num_heads
         self.scaled_dot_attn = ScaledDotProductAttention(self.head_dim)
         
         # initialize one feed-forward layer (head dimension x number of heads) of each q, k and v
         # instead of initializing number of heads of feed-forward layers (head dimension / number of heads)
-        self.query_proj = nn.Linear(emd_dim, self.head_dim * num_heads)
-        self.key_proj = nn.Linear(emd_dim, self.head_dim * num_heads)
-        self.value_proj = nn.Linear(emd_dim, self.head_dim * num_heads)
+        self.query_proj = nn.Linear(emb_dim, self.head_dim * num_heads)
+        self.key_proj = nn.Linear(emb_dim, self.head_dim * num_heads)
+        self.value_proj = nn.Linear(emb_dim, self.head_dim * num_heads)
         
-        self.out_proj = nn.Linear(emd_dim, self.head_dim * num_heads)
+        self.out_proj = nn.Linear(emb_dim, self.head_dim * num_heads)
         
         
     def reshape_from_feed_forward(self, batch_size, _tensor):
