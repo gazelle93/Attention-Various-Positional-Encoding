@@ -29,7 +29,6 @@ def main(args):
     input_length, emb_dim = embeddings.size()
     query = key = value = embeddings.reshape(batch_size, input_length, emb_dim)
 
-    print(query.type())
     if args.attention == "scaleddotproduct":
         model = ScaledDotProductAttention(emb_dim)
         output, attn_score = model(query, key, value)
