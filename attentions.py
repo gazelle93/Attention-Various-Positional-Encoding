@@ -51,7 +51,7 @@ class AbsolutePositionalEncoder(nn.Module):
         return self.positional_encoding[:batch_size, :seq_len, :]
       
       
-      
+# Multi-Head Attention using Absolute Positional Encoding
 class MultiHeadAttention(nn.Module):
 
     def __init__(self, emb_dim, num_heads):
