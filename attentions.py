@@ -68,11 +68,6 @@ class MultiHeadAttention(nn.Module):
         self.value_proj = nn.Linear(emb_dim, self.head_dim * num_heads)
         self.out_proj = nn.Linear(emb_dim, self.head_dim * num_heads)
         
-        nn.init.xavier_uniform_(self.query_proj)
-        nn.init.xavier_uniform_(self.key_proj)
-        nn.init.xavier_uniform_(self.value_proj)
-        nn.init.xavier_uniform_(self.out_proj)
-        
         
     def reshape_from_feed_forward(self, batch_size, _tensor):
         return _tensor.view(batch_size, -1, self.num_heads, self.head_dim)
