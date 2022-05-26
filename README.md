@@ -1,7 +1,9 @@
 # Overview
-- After the emergence of Attention, the language models leveraging the attention layer show the best performance in various NLP tasks. Attention allows attending to utilize the most relevant parts of the input sequence by leveraging the attention score which is a weighted result of all of the encoded input vectors simultaneously. Therefore, attention layers are able to increase the learning speed through parallelization without the restrictions appearing in such sequential architectures. This project aims to implement the Scaled-Dot-Product Attention layer and the Multi-Head Attention layer using Absolute Positional Encoding.
+- After the emergence of Attention, the language models leveraging the attention layer show the best performance in various NLP tasks. Attention allows attending to utilize the most relevant parts of the input sequence by leveraging the attention score which is a weighted result of all of the encoded input vectors simultaneously. Therefore, attention layers are able to increase the learning speed through parallelization without the restrictions appearing in such sequential architectures. This project aims to implement the Scaled-Dot-Product Attention layer and the Multi-Head Attention layer using Absolute Positional Encoding, Relative Position representation of Shaw et al. (2018) and Relative Position representation of Raffel et al. (2019).
 
-$$\alpha_{ij} = \frac{1}{\sqrt{d}}((w_i+p_i)W^{Q,1})(w_j+p_j)W^{K,1})^T$$
+$$\alpha_{ij}^{Abs} = \frac{1}{\sqrt{d}}((w_i+p_i)W^{Q,1})(w_j+p_j)W^{K,1})^T$$
+$$\alpha_{ij}^{Rel} = \frac{1}{\sqrt{d}}((w_i+p_i)W^{Q,l})((w_j+p_j)W^{K,l}+a_{j-i}^l)^T$$
+$$\alpha_{ij}^{T5} = \frac{1}{\sqrt{d}}((w_i+p_i)W^{Q,l})((w_j+p_j)W^{K,l})^T+b_{j-i}$$
 
 # Brief description
 - text_processing.py
@@ -28,9 +30,12 @@ $$\alpha_{ij} = \frac{1}{\sqrt{d}}((w_i+p_i)W^{Q,1})(w_j+p_j)W^{K,1})^T$$
 - unk_ignore(bool, defaults to True): Ignore unseen word or not.
 - num_heads(int, defaults to 8): The number of heads for multi-head attention.
 - attention(str, defaults to "multihead"): Type of attention layer. (scaleddotproduct, multihead)
+- positional_encoding(str, defaults to "abs"): Type of positional encoding. (abs, rel, t5)
 
 # References
 - Attention: Vaswani, A., Shazeer, N., Parmar, N., Uszkoreit, J., Jones, L., Gomez, A. N., ... & Polosukhin, I. (2017). Attention is all you need. Advances in neural information processing systems, 30.
+- Relative Postion Representation: Shaw, P., Uszkoreit, J., & Vaswani, A. (2018). Self-attention with relative position representations. arXiv preprint arXiv:1803.02155.
+- T5 Relative Postion Representation: Raffel, C., Shazeer, N., Roberts, A., Lee, K., Narang, S., Matena, M., ... & Liu, P. J. (2019). Exploring the limits of transfer learning with a unified text-to-text transformer. arXiv preprint arXiv:1910.10683.
 - Stanza: Qi, P., Zhang, Y., Zhang, Y., Bolton, J., & Manning, C. D. (2020). Stanza: A Python natural language processing toolkit for many human languages. arXiv preprint arXiv:2003.07082.
 - Spacy: Matthew Honnibal and Ines Montani. 2017. spaCy 2: Natural language understanding with Bloom embeddings, convolutional neural networks and incremental parsing. To appear (2017).
 - NLTK: Bird, Steven, Edward Loper and Ewan Klein (2009). Natural Language Processing with Python. O'Reilly Media Inc.
