@@ -5,10 +5,10 @@ $$\alpha_{ij}^{Abs} = \frac{1}{\sqrt{d}}((w_i+p_i)W^{Q,1})(w_j+p_j)W^{K,1})^T$$
 where $w_i$ is word embedding, $p_i$ is absolute positional encoding, $W^{Q,1}$ and $W^{K,1}$ is corresponding weight of query and key.
 
 $$\alpha_{ij}^{Rel} = \frac{1}{\sqrt{d}}((w_i+p_i)W^{Q,l})((w_j+p_j)W^{K,l}+a_{j-i}^l)^T$$
-where a_{j-i}^l is learnable parameter that represent the embedding of the relative position $j−i$ in layer $l$.
+where $a_{j-i}^l$ is learnable parameter that represent the embedding of the relative position $j−i$ in layer $l$.
 
 $$\alpha_{ij}^{T5} = \frac{1}{\sqrt{d}}((w_i+p_i)W^{Q,l})((w_j+p_j)W^{K,l})^T+b_{j-i}$$
-whereb_{j-i} is learnable parameter that represent the embedding of the relative position $j−i$ and this is shared in all layers.
+where $b_{j-i}$ is learnable parameter that represent the embedding of the relative position $j−i$ and this is shared in all layers.
 
 # Brief description
 - text_processing.py
