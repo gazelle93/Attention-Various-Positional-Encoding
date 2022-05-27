@@ -1,12 +1,15 @@
 # Overview
 - After the emergence of Attention, the language models leveraging the attention layer show the best performance in various NLP tasks. Attention allows attending to utilize the most relevant parts of the input sequence by leveraging the attention score which is a weighted result of all of the encoded input vectors simultaneously. Therefore, attention layers are able to increase the learning speed through parallelization without the restrictions appearing in such sequential architectures. This project aims to implement the Scaled-Dot-Product Attention layer and the Multi-Head Attention layer using Absolute Positional Encoding, Relative Position representation of Shaw et al. (2018) and Relative Position representation of Raffel et al. (2019).
 
+- Attention score using Absolute Positional Encoding:
 $$\alpha_{ij}^{Abs} = \frac{1}{\sqrt{d}}((w_i+p_i)W^{Q,1})(w_j+p_j)W^{K,1})^T$$
 where $w_i$ is word embedding, $p_i$ is absolute positional encoding, $W^{Q,1}$ and $W^{K,1}$ is corresponding weight of query and key.
 
+- Attention score using Relative Position representation of Shaw et al. (2018):
 $$\alpha_{ij}^{Rel} = \frac{1}{\sqrt{d}}((w_i+p_i)W^{Q,l})((w_j+p_j)W^{K,l}+a_{j-i}^l)^T$$
 where $a_{j-i}^l$ is a learnable parameter that represents the embedding of the relative position $j−i$ in layer $l$.
 
+- Attention score using Relative Position representation of Raffel et al. (2019):
 $$\alpha_{ij}^{T5} = \frac{1}{\sqrt{d}}((w_i+p_i)W^{Q,l})((w_j+p_j)W^{K,l})^T+b_{j-i}$$
 where $b_{j-i}$ is a learnable parameter that represents the embedding of the relative position $j−i$ and this is shared in all layers.
 
