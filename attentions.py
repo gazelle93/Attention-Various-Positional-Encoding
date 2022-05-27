@@ -260,8 +260,8 @@ class MultiHeadAttention(nn.Module):
     
     
     
-def get_attn_output(input_embedding, selected_attn, selected_pe):
-    emb_dim = input_embedding.shape()[-1]
+def get_attn_output(input_embedding, selected_attn, selected_pe, _num_heads):
+    emb_dim = input_embedding.size()[-1]
     
     # input embedding + positional encoding
     positional_encoder = AbsolutePositionalEncoder(emb_dim)
@@ -280,14 +280,14 @@ def get_attn_output(input_embedding, selected_attn, selected_pe):
             return output, attn_score
 
         elif selected_attn == "multihead":
-            if emb_dim % args.num_heads != 0:
+            if emb_dim % _num_heads != 0:
                 divisor_list = []
                 for i in range(1, emb_dim):
                     if emb_dim % i == 0:
                         divisor_list.append(i)
                 num_heads = divisor_list[len(divisor_list)//2]
             else:
-                num_heads = args.num_heads
+                num_heads = _num_heads
 
             model = MultiHeadAttention(emb_dim, num_heads)
             output, attn_score = model(query, key, value)
@@ -316,14 +316,14 @@ def get_attn_output(input_embedding, selected_attn, selected_pe):
 
 
         elif selected_attn == "multihead":
-            if emb_dim % args.num_heads != 0:
+            if emb_dim % _num_heads != 0:
                 divisor_list = []
                 for i in range(1, emb_dim):
                     if emb_dim % i == 0:
                         divisor_list.append(i)
                 num_heads = divisor_list[len(divisor_list)//2]
             else:
-                num_heads = args.num_heads
+                num_heads = _num_heads
 
             model = MultiHeadAttention(emb_dim, num_heads)
             output, attn_score = model(query, key, value)
@@ -349,14 +349,14 @@ def get_attn_output(input_embedding, selected_attn, selected_pe):
 
 
         elif selected_attn == "multihead":
-            if emb_dim % args.num_heads != 0:
+            if emb_dim % _num_heads != 0:
                 divisor_list = []
                 for i in range(1, emb_dim):
                     if emb_dim % i == 0:
                         divisor_list.append(i)
                 num_heads = divisor_list[len(divisor_list)//2]
             else:
-                num_heads = args.num_heads
+                num_heads = _num_heads
 
             model = MultiHeadAttention(emb_dim, num_heads)
             output, attn_score = model(query, key, value)
