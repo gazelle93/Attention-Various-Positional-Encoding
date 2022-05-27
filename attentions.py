@@ -256,3 +256,109 @@ class MultiHeadAttention(nn.Module):
         output = self.out_proj(output)
 
         return output, attn_score
+
+    
+    
+    
+def get_attn_output(input_embedding, selected_attn, selected_pe):
+    emb_dim = input_embedding.shape()[-1]
+    
+    # input embedding + positional encoding
+    positional_encoder = AbsolutePositionalEncoder(emb_dim)
+    input_embedding = input_embedding + positional_encoder(input_embedding)
+    query = key = value = input_embedding
+
+    seq_len_query = query.size()[1]
+    seq_len_key = key.size()[1]
+
+    # Absolute Positional Encoding
+    if selected_pe == "abs":
+        if selected_attn == "scaleddotproduct":
+            model = ScaledDotProductAttention(emb_dim)
+            output, attn_score = model(query, key, value)
+
+            return output, attn_score
+
+        elif selected_attn == "multihead":
+            if emb_dim % args.num_heads != 0:
+                divisor_list = []
+                for i in range(1, emb_dim):
+                    if emb_dim % i == 0:
+                        divisor_list.append(i)
+                num_heads = divisor_list[len(divisor_list)//2]
+            else:
+                num_heads = args.num_heads
+
+            model = MultiHeadAttention(emb_dim, num_heads)
+            output, attn_score = model(query, key, value)
+
+            return output, attn_score
+
+
+    # Relative Positional Encoding
+    elif selected_pe == "rel":
+        if selected_attn == "scaleddotproduct":
+            relative_position_k = RelativePositionalEncoder(emb_dim)
+            relative_position_v = RelativePositionalEncoder(emb_dim)
+
+            seq_len_query = query.size()[1]
+            seq_len_key = key.size()[1]
+            seq_len_value = value.size()[1]
+
+            a_key = relative_position_k(seq_len_query, seq_len_key)
+            a_value = relative_position_v(seq_len_query, seq_len_value)
+
+            model = RelativeScaledDotProductAttention(emb_dim)
+
+            output, attn_score = model(query, key, value, a_key, a_value)
+
+            return output, attn_score
+
+
+        elif selected_attn == "multihead":
+            if emb_dim % args.num_heads != 0:
+                divisor_list = []
+                for i in range(1, emb_dim):
+                    if emb_dim % i == 0:
+                        divisor_list.append(i)
+                num_heads = divisor_list[len(divisor_list)//2]
+            else:
+                num_heads = args.num_heads
+
+            model = MultiHeadAttention(emb_dim, num_heads)
+            output, attn_score = model(query, key, value)
+
+            return output, attn_score
+
+
+    # T5 Relative Positional Encoding
+    elif selected_pe == "t5":
+        if selected_attn == "scaleddotproduct":
+            relative_position_bias = T5RelativePositionalEncoder(1)
+
+            seq_len_query = query.size()[1]
+            seq_len_key = key.size()[1]
+
+            relative_bias = relative_position_bias(seq_len_query, seq_len_key)
+
+            model = T5ScaledDotProductAttention(emb_dim)
+
+            output, attn_score = model(query, key, value, relative_bias)
+
+            return output, attn_score
+
+
+        elif selected_attn == "multihead":
+            if emb_dim % args.num_heads != 0:
+                divisor_list = []
+                for i in range(1, emb_dim):
+                    if emb_dim % i == 0:
+                        divisor_list.append(i)
+                num_heads = divisor_list[len(divisor_list)//2]
+            else:
+                num_heads = args.num_heads
+
+            model = MultiHeadAttention(emb_dim, num_heads)
+            output, attn_score = model(query, key, value)
+
+            return output, attn_score
