@@ -176,7 +176,6 @@ class MultiHeadAttention(nn.Module):
 
         elif positional_encoding == "t5":
             self.t5_scaled_dot_attn = T5ScaledDotProductAttention(self.head_dim)
-            self.relative_position_bias = T5RelativePositionalEncoder(num_heads)
 
 
     def reshape_from_feed_forward(self, batch_size, _tensor):
@@ -199,7 +198,7 @@ class MultiHeadAttention(nn.Module):
         return _tensor.contiguous().view(batch_size, -1, self.num_heads * self.head_dim)
 
 
-    def forward(self, query, key, value, mask = None):
+    def forward(self, query, key, value, mask = None, relative_bias=None):
         # shape of input of q, k and v: (batch size, input length, embedding dimension)
         batch_size = query.size()[0]
 
@@ -240,7 +239,6 @@ class MultiHeadAttention(nn.Module):
         elif self.positional_encoding == "t5":
             seq_len_query = query.size()[1]
             seq_len_key = key.size()[1]
-            relative_bias = self.relative_position_bias(seq_len_query, seq_len_key)
             output, attn_score = self.t5_scaled_dot_attn(query, key, value, relative_bias, mask)
 
 
@@ -358,7 +356,10 @@ def get_attn_output(input_embedding, selected_attn, selected_pe, _num_heads):
             else:
                 num_heads = _num_heads
 
+            relative_position_bias = T5RelativePositionalEncoder(_num_heads)
+            relative_bias = relative_position_bias(seq_len_query, seq_len_key)
+
             model = MultiHeadAttention(emb_dim, num_heads)
-            output, attn_score = model(query, key, value)
+            output, attn_score = model(query, key, value, relative_bias=relative_bias)
 
             return output, attn_score
