@@ -25,7 +25,7 @@ def main(args):
     input_embedding = embeddings.reshape(batch_size, input_length, emb_dim)
     
     
-    output, attn_score = get_attn_output(input_embedding, args.attention, args.positional_encoding)
+    output, attn_score = get_attn_output(input_embedding, args.attention, args.positional_encoding, args.num_heads)
     print("Selected Attention: {}".format(args.attention))
     print("Selected Positional Encoding: {}".format(args.positional_encoding))
     print(output)
