@@ -258,6 +258,15 @@ class MultiHeadAttention(nn.Module):
     
     
     
+def get_candidate_heads(emb_dim, _num_heads):
+    divisor_list = []
+    for i in range(1, emb_dim):
+        if emb_dim % i == 0:
+            divisor_list.append(i)
+    return divisor_list[len(divisor_list)//2]
+    
+    
+    
 def get_attn_output(input_embedding, selected_attn, selected_pe, _num_heads):
     emb_dim = input_embedding.size()[-1]
     
@@ -268,6 +277,7 @@ def get_attn_output(input_embedding, selected_attn, selected_pe, _num_heads):
 
     seq_len_query = query.size()[1]
     seq_len_key = key.size()[1]
+    seq_len_value = value.size()[1]
 
     # Absolute Positional Encoding
     if selected_pe == "abs":
@@ -279,11 +289,7 @@ def get_attn_output(input_embedding, selected_attn, selected_pe, _num_heads):
 
         elif selected_attn == "multihead":
             if emb_dim % _num_heads != 0:
-                divisor_list = []
-                for i in range(1, emb_dim):
-                    if emb_dim % i == 0:
-                        divisor_list.append(i)
-                num_heads = divisor_list[len(divisor_list)//2]
+                num_heads = get_candidate_heads(emb_dim, _num_heads)
             else:
                 num_heads = _num_heads
 
@@ -299,10 +305,6 @@ def get_attn_output(input_embedding, selected_attn, selected_pe, _num_heads):
             relative_position_k = RelativePositionalEncoder(emb_dim)
             relative_position_v = RelativePositionalEncoder(emb_dim)
 
-            seq_len_query = query.size()[1]
-            seq_len_key = key.size()[1]
-            seq_len_value = value.size()[1]
-
             a_key = relative_position_k(seq_len_query, seq_len_key)
             a_value = relative_position_v(seq_len_query, seq_len_value)
 
@@ -315,11 +317,7 @@ def get_attn_output(input_embedding, selected_attn, selected_pe, _num_heads):
 
         elif selected_attn == "multihead":
             if emb_dim % _num_heads != 0:
-                divisor_list = []
-                for i in range(1, emb_dim):
-                    if emb_dim % i == 0:
-                        divisor_list.append(i)
-                num_heads = divisor_list[len(divisor_list)//2]
+                num_heads = get_candidate_heads(emb_dim, _num_heads)
             else:
                 num_heads = _num_heads
 
@@ -334,9 +332,6 @@ def get_attn_output(input_embedding, selected_attn, selected_pe, _num_heads):
         if selected_attn == "scaleddotproduct":
             relative_position_bias = T5RelativePositionalEncoder(1)
 
-            seq_len_query = query.size()[1]
-            seq_len_key = key.size()[1]
-
             relative_bias = relative_position_bias(seq_len_query, seq_len_key)
 
             model = T5ScaledDotProductAttention(emb_dim)
@@ -348,11 +343,7 @@ def get_attn_output(input_embedding, selected_attn, selected_pe, _num_heads):
 
         elif selected_attn == "multihead":
             if emb_dim % _num_heads != 0:
-                divisor_list = []
-                for i in range(1, emb_dim):
-                    if emb_dim % i == 0:
-                        divisor_list.append(i)
-                num_heads = divisor_list[len(divisor_list)//2]
+                num_heads = get_candidate_heads(emb_dim, _num_heads)
             else:
                 num_heads = _num_heads
 
