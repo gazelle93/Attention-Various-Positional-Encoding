@@ -37,7 +37,7 @@ if __name__ == "__main__":
 
     parser.add_argument("--nlp_pipeline", default="spacy", type=str, help="NLP preprocessing pipeline.")
     parser.add_argument("--unk_ignore", default=True, help="Ignore unknown tokens.")
-    parser.add_argument("--num_heads", default=8, help="The number of heads for multi-head attention.")
+    parser.add_argument("--num_heads", default=8, type=int, help="The number of heads for multi-head attention.")
     parser.add_argument("--attention", default="scaleddotproduct", type=str, help="Type of attention layer. (scaleddotproduct, multihead)")
     parser.add_argument("--positional_encoding", default="abs", type=str, help="Type of positional encoding. (abs, rel, t5)")
     args = parser.parse_args()

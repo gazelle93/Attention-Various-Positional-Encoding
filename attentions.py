@@ -1,3 +1,5 @@
+import warnings
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -20,7 +22,7 @@ class ScaledDotProductAttention(nn.Module):
         # Masking (Optional)
         # shape of mask: (batch size, input length of query, input length of key)
         if mask is not None:
-            attn_score.masked_fill_(mask, -1e18)
+            attn_score = attn_score.masked_fill(mask, torch.finfo(attn_score.dtype).min)
 
         # Softmax of the scaled score (alpha)
         attn_score = F.softmax(attn_score, -1)
@@ -50,7 +52,7 @@ class RelativeScaledDotProductAttention(nn.Module):
         # Masking (Optional)
         # shape of mask: (batch size, input length of query, input length of key)
         if mask is not None:
-            attn_score.masked_fill_(mask, -1e18)
+            attn_score = attn_score.masked_fill(mask, torch.finfo(attn_score.dtype).min)
 
         # Softmax of the scaled score (alpha)
         attn_score = F.softmax(attn_score, -1)
@@ -76,12 +78,16 @@ class T5ScaledDotProductAttention(nn.Module):
 
     def forward(self, query, key, value, relative_bias, mask = None):
         # Scaled score of the Matrix multiplication of query and key (e)
-        attn_score = torch.bmm(query, key.transpose(1, 2)) / self.scaling_factor + relative_bias.permute(2,0,1)
+        # relative_bias arrives as (seq_len_q, seq_len_k, num_heads) and is
+        # shared across the batch; expand it to match (batch * heads, Lq, Lk)
+        bias = relative_bias.permute(2, 0, 1)
+        bias = bias.repeat(query.size(0) // bias.size(0), 1, 1)
+        attn_score = torch.bmm(query, key.transpose(1, 2)) / self.scaling_factor + bias
 
         # Masking (Optional)
         # shape of mask: (batch size, input length of query, input length of key)
         if mask is not None:
-            attn_score.masked_fill_(mask, -1e18)
+            attn_score = attn_score.masked_fill(mask, torch.finfo(attn_score.dtype).min)
 
         # Softmax of the scaled score (alpha)
         attn_score = F.softmax(attn_score, -1)
@@ -165,9 +171,12 @@ class MultiHeadAttention(nn.Module):
         value = self.reshape_to_ScaledDotProductAttention(batch_size, value)
 
 
-        # shape of mask: (batch size, number of heads, input length of query, input length of key)
+        # the attention tensors are (batch * heads, Lq, Lk), so the mask has to
+        # be flattened the same way rather than left as (batch, heads, Lq, Lk)
         if mask is not None:
-            mask = mask.unsqueeze(1).repeat(1, self.num_heads, 1, 1)
+            if mask.dim() == 3:          # (batch, Lq, Lk), shared across heads
+                mask = mask.unsqueeze(1).repeat(1, self.num_heads, 1, 1)
+            mask = mask.reshape(batch_size * self.num_heads, mask.size(-2), mask.size(-1))
 
         if self.positional_encoding == "abs":
             output, attn_score = self.scaled_dot_attn(query, key, value, mask)
@@ -187,8 +196,12 @@ class MultiHeadAttention(nn.Module):
 
 
         # reshape the result of the ScaledDotProductAttention
-        # shape: (number of heads, batch size, input length, head dimension)
-        output = output.view(self.num_heads, batch_size, -1, self.head_dim)
+        # reshape_to_ScaledDotProductAttention packed this batch-major, so the
+        # flat index is (batch * num_heads + head). Unpacking it as
+        # (num_heads, batch, ...) mixes heads across batch rows and silently
+        # returns the wrong answer for any batch_size > 1.
+        # shape: (batch size, number of heads, input length, head dimension)
+        output = output.view(batch_size, self.num_heads, -1, self.head_dim)
 
         # reshape to concat
         # shape: (number of heads, batch size, input length, head dimension)
@@ -199,106 +212,84 @@ class MultiHeadAttention(nn.Module):
         
         if is_dropout:
             output = self.dropout(output)
-            return output, attn_score
-        
+
         return output, attn_score
 
     
     
     
-def get_candidate_heads(emb_dim, _num_heads):
-    divisor_list = []
-    for i in range(1, emb_dim):
-        if emb_dim % i == 0:
-            divisor_list.append(i)
-    return divisor_list[len(divisor_list)//2]
+def get_candidate_heads(emb_dim, num_heads):
+    """Nearest head count that divides emb_dim.
+
+    Returns num_heads untouched when it already divides emb_dim. Otherwise it
+    picks the closest divisor and says so, because silently changing a model's
+    head count is expensive to debug.
+    """
+    num_heads = int(num_heads)
+    if emb_dim % num_heads == 0:
+        return num_heads
+
+    divisors = [i for i in range(1, emb_dim + 1) if emb_dim % i == 0]
+    # ties go to the larger divisor, so you never get less parallelism than asked
+    nearest = min(divisors, key=lambda d: (abs(d - num_heads), -d))
+    warnings.warn(
+        f"num_heads={num_heads} does not divide emb_dim={emb_dim}; "
+        f"using num_heads={nearest} instead.", stacklevel=2)
+    return nearest
     
     
     
 def get_attn_output(input_embedding, selected_attn, selected_pe, _num_heads):
     emb_dim = input_embedding.size()[-1]
-    
-    # input embedding + positional encoding
-    positional_encoder = AbsolutePositionalEncoder(emb_dim)
-    input_embedding = input_embedding + positional_encoder(input_embedding)
-    query = key = value = input_embedding
 
+    # Absolute encoding is added at the input, and only when it is the scheme
+    # being used. Shaw et al. and Raffel et al. both replace it rather than
+    # stack on top of it, so adding it unconditionally would make every "rel"
+    # or "t5" run a mixture and the comparison meaningless.
+    if selected_pe == "abs":
+        positional_encoder = AbsolutePositionalEncoder(emb_dim)
+        input_embedding = input_embedding + positional_encoder(input_embedding)
+
+    query = key = value = input_embedding
     seq_len_query = query.size()[1]
     seq_len_key = key.size()[1]
     seq_len_value = value.size()[1]
 
-    # Absolute Positional Encoding
+    if selected_attn not in ("scaleddotproduct", "multihead"):
+        raise ValueError(
+            f"selected_attn must be 'scaleddotproduct' or 'multihead', "
+            f"got {selected_attn!r}")
+    if selected_pe not in ("abs", "rel", "t5"):
+        raise ValueError(
+            f"selected_pe must be 'abs', 'rel' or 't5', got {selected_pe!r}")
+
+    if selected_attn == "multihead":
+        num_heads = get_candidate_heads(emb_dim, _num_heads)
+        # selected_pe has to reach the module. Leaving it off meant every
+        # multi-head run used the default "abs" branch, so "rel" and "t5"
+        # produced bit-identical output and the comparison was a no-op.
+        model = MultiHeadAttention(emb_dim, num_heads, selected_pe)
+
+        relative_bias = None
+        if selected_pe == "t5":
+            # built with num_heads, not the requested count: the two differ
+            # whenever the request does not divide emb_dim
+            relative_bias = T5RelativePositionalEncoder(num_heads)(
+                seq_len_query, seq_len_key)
+
+        return model(query, key, value, relative_bias=relative_bias)
+
+    # single-head scaled dot product
     if selected_pe == "abs":
-        if selected_attn == "scaleddotproduct":
-            model = ScaledDotProductAttention(emb_dim)
-            output, attn_score = model(query, key, value)
+        model = ScaledDotProductAttention(emb_dim)
+        return model(query, key, value)
 
-            return output, attn_score
+    if selected_pe == "rel":
+        a_key = RelativePositionalEncoder(emb_dim)(seq_len_query, seq_len_key)
+        a_value = RelativePositionalEncoder(emb_dim)(seq_len_query, seq_len_value)
+        model = RelativeScaledDotProductAttention(emb_dim)
+        return model(query, key, value, a_key, a_value)
 
-        elif selected_attn == "multihead":
-            if emb_dim % _num_heads != 0:
-                num_heads = get_candidate_heads(emb_dim, _num_heads)
-            else:
-                num_heads = _num_heads
-
-            model = MultiHeadAttention(emb_dim, num_heads)
-            output, attn_score = model(query, key, value)
-
-            return output, attn_score
-
-
-    # Relative Positional Encoding
-    elif selected_pe == "rel":
-        if selected_attn == "scaleddotproduct":
-            relative_position_k = RelativePositionalEncoder(emb_dim)
-            relative_position_v = RelativePositionalEncoder(emb_dim)
-
-            a_key = relative_position_k(seq_len_query, seq_len_key)
-            a_value = relative_position_v(seq_len_query, seq_len_value)
-
-            model = RelativeScaledDotProductAttention(emb_dim)
-
-            output, attn_score = model(query, key, value, a_key, a_value)
-
-            return output, attn_score
-
-
-        elif selected_attn == "multihead":
-            if emb_dim % _num_heads != 0:
-                num_heads = get_candidate_heads(emb_dim, _num_heads)
-            else:
-                num_heads = _num_heads
-
-            model = MultiHeadAttention(emb_dim, num_heads)
-            output, attn_score = model(query, key, value)
-
-            return output, attn_score
-
-
-    # T5 Relative Positional Encoding
-    elif selected_pe == "t5":
-        if selected_attn == "scaleddotproduct":
-            relative_position_bias = T5RelativePositionalEncoder(1)
-
-            relative_bias = relative_position_bias(seq_len_query, seq_len_key)
-
-            model = T5ScaledDotProductAttention(emb_dim)
-
-            output, attn_score = model(query, key, value, relative_bias)
-
-            return output, attn_score
-
-
-        elif selected_attn == "multihead":
-            if emb_dim % _num_heads != 0:
-                num_heads = get_candidate_heads(emb_dim, _num_heads)
-            else:
-                num_heads = _num_heads
-
-            relative_position_bias = T5RelativePositionalEncoder(_num_heads)
-            relative_bias = relative_position_bias(seq_len_query, seq_len_key)
-
-            model = MultiHeadAttention(emb_dim, num_heads)
-            output, attn_score = model(query, key, value, relative_bias=relative_bias)
-
-            return output, attn_score
+    relative_bias = T5RelativePositionalEncoder(1)(seq_len_query, seq_len_key)
+    model = T5ScaledDotProductAttention(emb_dim)
+    return model(query, key, value, relative_bias)

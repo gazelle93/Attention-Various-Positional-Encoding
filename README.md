@@ -7,12 +7,12 @@ where $w_i$ is word embedding, $p_i$ is absolute positional encoding, $W^{Q,1}$ 
 The absolute positional encoding method is applied to represent the position representation of tokens in Transformer-based architecture. This representation is summed to the word embeddings at the input level.
 
 - Attention score using Relative Position representation of Shaw et al. (2018):
-$$\alpha_{ij}^{Rel} = \frac{1}{\sqrt{d}}((w_i+p_i)W^{Q,l})((w_j+p_j)W^{K,l}+a_{j-i}^l)^T$$
+$$\alpha_{ij}^{Rel} = \frac{1}{\sqrt{d}}(w_iW^{Q,l})(w_jW^{K,l}+a_{j-i}^l)^T$$
 where $a_{j-i}^l$ is a learnable parameter that represents the embedding of the relative position $j−i$ in layer $l$.
 In order to represent longer sentences in the generalized auto-regressive pretraining model (XLNet), the relative positional encoding is applied to represent the positional representation in multiple segments. This representation is applied at the self-attention-mechanism level, not at the input level.
 
 - Attention score using Relative Position representation of Raffel et al. (2019):
-$$\alpha_{ij}^{T5} = \frac{1}{\sqrt{d}}((w_i+p_i)W^{Q,l})((w_j+p_j)W^{K,l})^T+b_{j-i}$$
+$$\alpha_{ij}^{T5} = \frac{1}{\sqrt{d}}(w_iW^{Q,l})(w_jW^{K,l})^T+b_{j-i}$$
 where $b_{j-i}$ is a learnable parameter that represents the embedding of the relative position $j−i$ and this is shared in all layers.
 
 # Brief description
@@ -52,3 +52,10 @@ where $b_{j-i}$ is a learnable parameter that represents the embedding of the re
 - Spacy: Matthew Honnibal and Ines Montani. 2017. spaCy 2: Natural language understanding with Bloom embeddings, convolutional neural networks and incremental parsing. To appear (2017).
 - NLTK: Bird, Steven, Edward Loper and Ewan Klein (2009). Natural Language Processing with Python. O'Reilly Media Inc.
 - Gensim: Rehurek, R., & Sojka, P. (2010). Software framework for topic modelling with large corpora. In In Proceedings of the LREC 2010 workshop on new challenges for NLP frameworks.
+
+# Corrections (2026-10-16)
+
+Earlier versions ignored the selected positional encoding under `multihead`,
+so all three options ran the same computation, and returned incorrect
+attention outputs for any batch larger than one. Both are fixed, and
+`test_correctness.py` guards them.
